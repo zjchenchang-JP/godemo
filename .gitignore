@@ -1,0 +1,27 @@
+# ===== Go 编译产物 =====
+*.exe        # go build 生成的可执行文件（Windows）
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test       # go test -c 生成的测试二进制
+*.out        # 测试覆盖率文件 (go test -coverprofile)
+
+# ===== 示例的运行时数据 =====
+# 16 课运行后生成的演示文件
+demo.txt
+demo_buf.txt
+# 19 课 Todo 应用的数据文件
+todos.json
+
+# ===== 编辑器 / IDE =====
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ===== 操作系统 =====
+Thumbs.db
+.DS_Store
+
+# ===== 个人截图（学习笔记图片，不入库）=====
