@@ -17,9 +17,9 @@ func main() {
 	// 有符号：int8/16/32/64 + int（平台相关，64位系统上是64位）
 	// 无符号：uint8/16/32/64 + uint
 	// 两个别名：byte = uint8（字节）、rune = int32（Unicode 码点）
-	var i8 int8 = 127       // int8 范围：-128 ~ 127
-	ui8 := uint8(255)       // uint8 范围：0 ~ 255
-	big := 9_223_372_036_854_775_807 // int64 最大值，可用下划线分隔提高可读性
+	var i8 int8 = 127                   // int8 范围：-128 ~ 127
+	ui8 := uint8(255)                   // uint8 范围：0 ~ 255
+	big := 9_223_372_036_854_775_807    // int64 最大值，可用下划线分隔提高可读性
 	hex, oct, bin := 0xFF, 0o17, 0b1010 // 十六进制、八进制、二进制字面量
 	fmt.Println(i8, ui8, big, hex, oct, bin)
 
@@ -29,15 +29,19 @@ func main() {
 	fmt.Println("int8(127)+1 =", overflow) // -128，环绕到了最小值
 
 	// ---------- 2. 浮点型 ----------
-	f32 := 3.14            // 不写类型时，浮点字面量默认 float64
+	f32 := 3.14 // 不写类型时，浮点字面量默认 float64
 	var f64 float64 = 2.718281828
 	fmt.Printf("float32=%.4f float64=%.10f\n", f32, f64)
 
 	// 【经典坑】浮点数有精度误差，不能直接用 == 比较
 	a := 0.1 + 0.2
-	fmt.Println(0.1+0.2 == 0.3)         // false！
-	fmt.Printf("%.17f\n", a)            // 0.30000000000000004
-	fmt.Println(abs(a-0.3) < 1e-9)      // 正确做法：差值小于某个极小值
+	// 无类型浮点常量（Untyped Float Constants）常量表达式总是在编译期求值，且使用任意精度
+	// Go 的常量是数学对象，变量才是计算机对象
+	fmt.Println("0.1+0.2 == 0.3 :", (0.1+0.2) == 0.3)      // 纯常量表达式，编译期高精度求值 true
+	fmt.Println(float64(0.1)+float64(0.2) == float64(0.3)) // false! 显式指定类型为 float64
+	fmt.Printf("%.17f\n", a)                               // 0.29999999999999999
+	// 1e-9 科学计数法 即0.000000001（十亿分之一）
+	fmt.Println(abs(a-0.3) < 1e-9) // 正确做法：差值小于某个极小值 允许误差在可接受范围内
 
 	// ---------- 3. 布尔型 ----------
 	ok := true
@@ -46,16 +50,25 @@ func main() {
 
 	// ---------- 4. 字符串 ----------
 	s := "Hello, 世界"
-	fmt.Println("长度(字节):", len(s))                   // 13：中文每字占 3 字节(UTF-8)
-	fmt.Println("字符数:", utf8.RuneCountInString(s))    // 9
+	fmt.Println("长度(字节):", len(s))                 // 返回的是 UTF-8 字节数，不是字符数！//13 中文每字占 3 字节(UTF-8)
+	fmt.Println("字符数:", utf8.RuneCountInString(s)) // 9
 
 	// 字符串是不可变的 byte 切片
 	// s[0] = 'h' // 编译错误！不能修改
-	fmt.Printf("第1个字节: %c, 类型: %T\n", s[0], s[0]) // 'H', uint8
+	fmt.Printf("第1个字节: %c, 类型: %T\n", s[0], s[0]) // 'H', uint8 即 (byte)
 
 	// 遍历字符串：range 按"字符(rune)"遍历，而不是字节
 	for i, r := range s {
 		fmt.Printf("  下标%d: %q\n", i, r)
+	}
+	// 按字节索引遍历：每个元素都是 uint8
+	for i := 0; i < len(s); i++ {
+		// s[0] = 48 (uint8)  ← 'H'
+		// s[1] = 65 (uint8)  ← 'e'
+		// s[7] = E4 (uint8)  ← '世' 的第1个字节
+		// s[8] = B8 (uint8)  ← '世' 的第2个字节
+		// s[9] = 96 (uint8)  ← '世' 的第3个字节
+		fmt.Printf("s[%d] = %02X (%T)\n", i, s[i], s[i])
 	}
 
 	// 原始字符串（反引号）：不转义、可换行，常用于正则和 JSON 模板
@@ -64,8 +77,8 @@ func main() {
 	fmt.Println(raw)
 
 	// ---------- 5. rune 与 byte ----------
-	var ch rune = '中'      // 单引号 = 字符字面量，类型是 rune(int32)
-	var bt byte = 'A'       // 也可以是 byte(uint8)
+	var ch rune = '中' // 单引号 = 字符字面量，类型是 rune(int32)
+	var bt byte = 'A' // 也可以是 byte(uint8)
 	fmt.Printf("%c=%d, %c=%d\n", ch, ch, bt, bt)
 
 	// ---------- 6. 类型转换 ----------
@@ -73,9 +86,9 @@ func main() {
 	// var f float64 = 1     // 整数字面量可以（无类型常量）
 	// var f2 float64 = intVar // 但 int 变量不行，必须写 float64(intVar)
 	n := 42
-	f := float64(n)     // int -> float64
-	back := int(f)      // float64 -> int（直接截断小数，不四舍五入）
-	ui := uint8(n)      // 范围内转换 OK
+	f := float64(n) // int -> float64
+	back := int(f)  // float64 -> int（直接截断小数，不四舍五入）
+	ui := uint8(n)  // 范围内转换 OK
 	fmt.Println(f, back, ui)
 
 	// 注意：常量直接转 int 会在编译期报错（int(3.99) 不允许），要经过变量
@@ -101,9 +114,9 @@ func main() {
 	fmt.Println(strconv.Itoa(code))  // "65"（把数字变成字符串的正确做法）
 
 	// 字符串 <-> []byte / []rune
-	bs := []byte(s)  // 用于 IO 操作、网络传输
-	rs := []rune(s)  // 用于按字符处理（如取第 N 个字符）
-	fmt.Println(string(bs) == s, string(rs[7])) // true 世（第8个字符）
+	bs := []byte(s)                                    // 用于 IO 操作、网络传输
+	rs := []rune(s)                                    // 用于按字符处理（如取第 N 个字符） 字符串转字符切片
+	fmt.Println(string(bs) == s, string(rs[7]), rs[7]) // true 世（第8个字符）
 
 	// ---------- 7. 复数与类型别名（了解）----------
 	var cplx complex128 = complex(3, 4) // 复数：3+4i
@@ -111,6 +124,22 @@ func main() {
 	// 类型别名：byte≈uint8、rune≈int32、any=interface{}（Go 1.18 起）
 	var anyVal any = "任意类型，第 09 课详讲"
 	fmt.Println(anyVal)
+
+	fmt.Println(s[0], s[1], s[2], s[3], s[4])
+	for i, r := range s {
+		if i < 5 {
+			fmt.Println("==============")
+			fmt.Println(r)
+		}
+	}
+	sr := []rune(s)
+	for i := 0; i < 5; i++ {
+		fmt.Printf("%c",sr[i])
+	}
+	fmt.Println()
+	float314, _ := strconv.ParseFloat("3.14", 64)
+	fmt.Println(float314 * 2)
+	fmt.Println("string(300)=", string(rune(300))) // Ĭ 字符
 }
 
 // abs 求绝对值

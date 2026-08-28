@@ -28,14 +28,14 @@ func main() {
 	fmt.Println(a, b, c == "")
 
 	// 方式二：短变量声明 :=（只能在函数内使用，最常用！）
-	x := 42        // 自动推断类型
-	y := "hello"   // string
-	z := 3.14      // float64
+	x := 42      // 自动推断类型
+	y := "hello" // string
+	z := 3.14    // float64
 	fmt.Println(x, y, z)
 
 	// 方式三：多重赋值
 	i, j, k := 1, 2, "三" // 多个变量一次声明，类型可以各不相同
-	i, j = j, i           // 【经典】一行交换两个变量的值（无需临时变量）
+	i, j = j, i          // 【经典】一行交换两个变量的值（无需临时变量）
 	fmt.Println(i, j, k)
 
 	// 【重要】声明了却未使用的变量会导致编译错误！
@@ -59,17 +59,20 @@ func main() {
 	// _ 用来丢弃不需要的值，"我声明了但不使用它"就不会报错。
 	_, keep := divide(10, 3) // 只要第二个返回值（函数在下方）
 	fmt.Println("10/3 的余数 =", keep)
+	result, _ := divide2(5, 2)
+	fmt.Println("5/2的商 =", result)
 
 	// ---------- 4. 常量 const ----------
 	// 常量在编译期确定，不可修改。类型可以是任意基本类型。
 	const Pi = 3.14159
 	const (
-		StatusOK  = 200 // 无类型常量，使用时根据上下文自动适配类型
-		Language  = "Go"
-		MaxSize   = 1 << 20 // 1MB，常量可以做编译期运算
+		StatusOK = 200 // 无类型常量，使用时根据上下文自动适配类型
+		Language = "Go"
+		MaxSize  = 1 << 20 // 1MB，常量可以做编译期运算
 	)
 	const Big float64 = 1e20 // 也可以显式指定类型
 	fmt.Println(Pi, StatusOK, Language, MaxSize, Big)
+	fmt.Printf("Big的类型=%T\n", Big)
 
 	// ---------- 5. iota：枚举生成器 ----------
 	// iota 在 const 块中从 0 开始，每新增一行自动 +1
@@ -92,7 +95,7 @@ func main() {
 
 	// iota 技巧二：跳值（_ 占位跳过一行）
 	const (
-		_  = iota // 跳过 0
+		_  = iota             // 跳过 0
 		KB = 1 << (10 * iota) // 1 << 10
 		MB                    // 1 << 20
 		GB                    // 1 << 30
@@ -103,13 +106,22 @@ func main() {
 	if n := 10; n > 5 { // if 语句中声明的变量只在 if/else 块内有效
 		fmt.Println("块内变量 n =", n)
 	}
+	if n := -2; n < 0 {
+		fmt.Println("n的值=", n)
+	}
 	// fmt.Println(n) // 取消注释会报错：n 在此处未定义
 	fmt.Println("包级变量：", globalCount, serverName, port, debug)
+	change(1, 2, 3)
 }
 
 // divide 返回商和余数（多返回值，第 05 课详讲）
 func divide(a, b int) (int, int) {
 	return a / b, a % b
+}
+func divide2(x, y int) (a int, b int) {
+	a = x / y
+	b = x % y
+	return
 }
 
 // ============================================================
@@ -118,3 +130,18 @@ func divide(a, b int) (int, int) {
 // 2. 用 iota 生成一个季节枚举（Spring=1..Winter=4，提示：_ 跳过 0）。
 // 3. 打印 1<<62 的值，体会 Go 整型不溢出的"常量魔法"（变量会溢出）。
 // ============================================================
+func change(x, y, z int) {
+	x, y, z = y, z, x
+	fmt.Println("交换后：", x, y, z)
+	const (
+		_ = iota
+		Spring
+		Xia
+		Qiu
+		Winter
+	)
+	fmt.Println("Spring =", Spring, "Xia =", Xia, "Qiu=", Qiu, "Winter=", Winter)
+	// 未指定类型的常量（Untyped Constant）拥有任意精度（Arbitrary Precision）。
+	// 编译器在处理常量表达式时，不会将其视为 64 位整数，而是视为一个数学上的大数
+	fmt.Println("1<<62=", 1<<62) // 把溢出的判断推迟到赋值时刻，而非计算时刻。
+}
