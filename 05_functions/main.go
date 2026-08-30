@@ -10,13 +10,19 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // ---------- 1. 函数定义的基本形式 ----------
 // func 函数名(参数名 类型, 参数名 类型) 返回类型 { ... }
 // 连续同类型参数可以只写最后一个类型
-func add(a, b int) int {
-	return a + b
+//
+//	func add(a, b int) int {
+//		return a + b
+//	}
+func add(a, b int) (c int) {
+	c = a + b
+	return
 }
 
 // ---------- 2. 多返回值（Go 的招牌特性）----------
@@ -26,6 +32,12 @@ func divide(a, b int) (int, error) {
 		return 0, errors.New("除数不能为零")
 	}
 	return a / b, nil // nil 表示"没有错误"
+}
+func divide1(a, b int) (int, error) {
+	if b == 0 {
+		return 0, errors.New("除数不能为零")
+	}
+	return a / b, nil
 }
 
 // ---------- 3. 命名返回值 ----------
@@ -97,10 +109,10 @@ func main() {
 	fmt.Println(split(17)) // 7 10
 
 	// ---------- 可变参数 ----------
-	fmt.Println(sum(1, 2, 3))        // 传任意个参数
-	fmt.Println(sum())               // 0 个也行
+	fmt.Println(sum(1, 2, 3)) // 传任意个参数
+	fmt.Println(sum())        // 0 个也行
 	nums := []int{4, 5, 6}
-	fmt.Println(sum(nums...))        // 切片展开传入（注意三个点）
+	fmt.Println(sum(nums...)) // 切片展开传入（注意三个点）
 
 	// ---------- 函数作为参数 ----------
 	fmt.Println("加法:", calc(3, 4, func(a, b int) int { return a + b })) // 匿名函数直接传
@@ -108,7 +120,7 @@ func main() {
 
 	// ---------- 闭包 ----------
 	// 闭包 = 匿名函数 + 它引用的外部变量。函数"记住"了外部环境
-	counter := makeCounter() // counter 捕获了自己的 count 变量
+	counter := makeCounter()                     // counter 捕获了自己的 count 变量
 	fmt.Println(counter(), counter(), counter()) // 1 2 3
 	counter2 := makeCounter()
 	fmt.Println(counter2()) // 1：每个闭包有独立的状态
@@ -126,15 +138,31 @@ func main() {
 	readFileDemo()
 
 	// 【重要】defer 的参数在 defer 语句处【立即求值】，函数体延迟执行
+	// 	defer f(x) 复制的是值，defer func(){ f(x) }() 捕获的是引用。
+	// 	什么时候想“冻结快照”用前者，想“看最终状态”用后者。
+	
 	x := 10
-	defer fmt.Println("defer 捕获的 x =", x) // 打印 10
+	defer fmt.Println("A 传参写法 defer 捕获的 x =", x) // 打印 10
+	defer func ()  {
+		fmt.Println("B 闭包写法 x =",x)
+	}()
 	x = 20
-	fmt.Println("当前 x =", x)
+	fmt.Println("C 当前 x =", x)
 
 	// 【坑】在循环里 defer 不会立即执行，会堆积到函数结束
 	for i := 0; i < 3; i++ {
 		defer fmt.Print(i, " ") // 全部堆到 main 结束才打印：2 1 0
 	}
+
+	fmt.Println(minMax(1,3,0))
+	fib := fibonacci()
+	for i := 0; i < 5; i++ {
+		fmt.Print(fib(), " ")
+	}
+	fmt.Println()
+
+	handler()
+	
 }
 
 func mul(a, b int) int {
@@ -165,8 +193,41 @@ func readFileDemo() {
 
 // ============================================================
 // 课后练习：
-// 1. 写一个 minMax(nums ...int) (int, int) 函数，返回最小值和最大值。
-// 2. 用闭包实现一个斐波那契生成器 fibonacci() func() int。
-// 3. 思考：如果 defer 后面跟的是闭包 defer func(){ print(x) }()，
-//    x=20 的修改会影响结果吗？（提示：闭包捕获的是变量引用）
+//  1. 写一个 minMax(nums ...int) (int, int) 函数，返回最小值和最大值。
+//  2. 用闭包实现一个斐波那契生成器 fibonacci() func() int。
+//  3. 思考：如果 defer 后面跟的是闭包 defer func(){ print(x) }()，
+//     x=20 的修改会影响结果吗？（提示：闭包捕获的是变量引用）
+//
 // ============================================================
+// 1.
+func minMax(nums ...int) (int, int, error) {
+	if len(nums)==0 {
+		return 0,0,errors.New("空参")
+	}
+	min, max := nums[0], nums[0]
+	for _, v := range nums{
+		if v >max {
+			max = v
+		}
+		if min > v {
+			min = v
+		}
+	}
+	return min,max,nil
+}
+// 2
+func fibonacci() func() int{
+	a,b := 0,1
+	return func() int {
+		a,b = b, a+b
+		return a
+	}
+}
+// 计时日志 闭包
+func handler() {
+	start := time.Now()
+	defer func() {
+		fmt.Printf("耗时 %v, err=%v\n", time.Since(start), errors.New("模拟错误")) // 此时 err 已是最终值
+	}()
+	// ... 业务逻辑 ...
+}
