@@ -13,7 +13,7 @@ package main
 // 【2】import：导入需要用到的包。单个包可以单独一行，多个包用括号分组。
 import (
 	"fmt"     // fmt 是格式化输入输出包（Format 的缩写，发音 /fomt/）
-	"strings" // 字符串工具包
+	s "strings" // 字符串工具包
 )
 
 // 其他导入写法（了解即可）：
@@ -42,9 +42,10 @@ func main() {
 	//   %s   字符串  %q 带引号的字符串  %t 布尔值
 	//   %x   十六进制  \n 换行  \t 制表符
 	fmt.Printf("类型=%T 值=%v 引用=%q\n", "Go语言", "Go语言", "Go语言")
+	fmt.Printf("对应十六进制=%x\n", 255)
 
 	// ---------- 使用导入的包 ----------
-	fmt.Println(strings.ToUpper("hello"), strings.Repeat("Go", 3))
+	fmt.Println(s.ToUpper("hello"), s.Repeat("Go", 3))
 
 	// ---------- 注释的三种写法 ----------
 	// 1. 单行注释：两个斜杠
