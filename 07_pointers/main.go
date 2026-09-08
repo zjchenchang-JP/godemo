@@ -71,7 +71,12 @@ func main() {
 	fmt.Printf("%T, %T, %T, %T", *n1, n2, n3, n4)
 	fmt.Println("")
 	m1N4(&n4)
+	m1N4(n3)
+	fmt.Println("修改n3后",n3)
 	fmt.Println("修改n4后",n4)
+	m2N4(n4)
+	fmt.Println("再修改n4=",n4)
+
 
 	// ---------- 6. Go 与 C 指针的区别 ----------
 	// 1) 没有 +1/-1 这类【指针运算】：p++ 是编译错误
@@ -93,6 +98,10 @@ func main() {
 	s := []int{1, 2, 3}
 	modifySlice(s) // 切片传值也能改（共享底层数组）
 	fmt.Println("切片被函数修改:", s)
+
+	u := User{"张三",199}
+	setAge(&u,18)
+	fmt.Println(u)
 }
 
 // User 演示用结构体
@@ -130,8 +139,11 @@ func m1N4(u *User){
 }
 
 func m2N4(u User){
+	// 为什么改不了形参的值了？
+	// up := &user // 指向结构体的指针
+	// 【语法糖】通过指针访问字段不需要写 (*up).Name，直接 up.Name 逻辑不是一样吗？
 	n := &u
-	fmt.Println(n.Name)
+	n.Name = "九千9000--"
 }
 
 // ============================================================
@@ -141,3 +153,6 @@ func m2N4(u User){
 // 3. 思考：modifySlice 没传指针为什么能改成功？如果 append 呢？
 //    （提示：append 扩容后指向新数组，修改不会影响原切片）
 // ============================================================
+func setAge(u *User, age int) {
+	u.Age = age
+}
