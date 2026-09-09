@@ -8,14 +8,16 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"reflect"
+	"strconv"
 )
 
 // ---------- 1. 结构体定义 ----------
 // struct 是一组字段的集合，Go 用它代替"类"
 type Person struct {
-	Name string // 字段：首字母大写 = 导出(公开)；小写 = 未导出(私有)
-	Age  int
+	Name  string // 字段：首字母大写 = 导出(公开)；小写 = 未导出(私有)
+	Age   int
 	email string // 私有字段：只在包内可见
 }
 
@@ -77,13 +79,15 @@ type User struct {
 func main() {
 	// ---------- 结构体的创建方式 ----------
 	p1 := Person{Name: "Alice", Age: 30, email: "a@x.com"} // 【推荐】指定字段名，顺序无关
-	p2 := Person{"Bob", 25, "b@x.com"}                      // 按声明顺序（不推荐）
+	p2 := Person{"Bob", 25, "b@x.com"}                     // 按声明顺序（不推荐）
 	p3 := Person{Name: "Charlie"}                          // 部分初始化，其余为零值
 	var p4 Person                                          // 零值结构体：{"" 0 ""}
 	p5 := new(Person)                                      // 返回指针 *Person
 
 	fmt.Println(p1, p2, p3, p4, p5)
 	fmt.Printf("%+v\n", p1) // %+v 打印带字段名: {Name:Alice Age:30 email:a@x.com}
+	fmt.Printf("%T", p5) // *main.Person 这是什么类型？？
+	fmt.Println("")
 
 	// 结构体是值类型：赋值即拷贝（内含切片/map 字段时是"浅拷贝"，注意！）
 	pc := p1
@@ -92,6 +96,10 @@ func main() {
 
 	// 结构体比较：所有字段都可比较时，可以用 == 直接比较
 	fmt.Println(p3 == Person{Name: "Charlie"}) // true
+	fmt.Println(p3 == Person{Age: 100})        // false 如果字段不对齐时，或者想自定义比较规则时，如何比较？
+	p3.Age = 1
+	p3.Name = ""
+	fmt.Println("修改后: ", p3 == Person{Age: 1}) // true
 
 	// ---------- 方法调用 ----------
 	fmt.Println(p1.Greet())
@@ -119,17 +127,40 @@ func main() {
 	// ---------- 方法值与方法表达式（了解）----------
 	greet := p1.Greet // 方法值：绑定了 p1 的函数
 	fmt.Println(greet())
+	fmt.Printf("greet的类型是=%T", greet)
+	fmt.Println()
 
 	// ---------- 结构体 tag ----------
 	u := User{Name: "Dave", Age: 40}
-	fmt.Printf("tag 演示: %v\n", u)
+	fmt.Printf("tag 演示（默认格式）: %v\n", u) // {Dave 40}
+	fmt.Println(u)// {Dave 40}
+	fmt.Printf("%+v\n",u)
 
 	// 用反射读取 tag（详细原理见第 15 课反射）
 	t := reflect.TypeOf(u)
 	if f, ok := t.FieldByName("Name"); ok {
-		fmt.Printf("Name 字段的 tag: %q\n", f.Tag)
+		fmt.Printf("Name 字段的 tag: %q\n", f.Tag) // "json:\"name\" validate:\"required\""
 		fmt.Println("json 名:", f.Tag.Get("json")) // name
 	}
+
+	// ---------- 课后练习演示 ----------
+	// 1) Stringer 生效：现在打印 Person 自动走 String()
+	//    （注意：文件开头第 87 行 fmt.Println(p1, p2, ...) 的输出从此也全变了）
+	fmt.Printf("%v\n", p1) // Person{Name=Alice2, Age=31}
+	fmt.Println(&p1)       // 打印指针同样触发
+
+	// 2) Rectangle / Circle 各自的 Area()
+	r := Rectangle{W: 3, H: 4}
+	c := Circle{R: 5}
+	fmt.Printf("矩形面积=%.2f 圆面积=%.2f\n", r.Area(), c.Area())
+
+	// 3) Employee：Person 的字段和方法全部提升
+	e := NewEmployee("小明", 30, 15000)
+	fmt.Println(e.Greet()) // 复用 Person 的方法
+	fmt.Println(e.Name)    // 等价于 e.Person.Name
+	e.Birthday()           // 指针方法照样提升调用
+	fmt.Println(e)                // Employee 自己的 String()（外层遮蔽）→ 连工资一起打印
+	fmt.Println(e.Person.String()) // 显式调用被遮蔽的 Person 版，同 d.Animal.Describe() 的写法
 }
 
 // ============================================================
@@ -140,3 +171,53 @@ func main() {
 //    大结构体适合用指针接收者。
 // 3. 用嵌入实现 Employee 包含 Person，再加 Salary 字段。
 // ============================================================
+// ---------- 练习 1：Person 实现 fmt.Stringer ----------
+// fmt 在 %v / %s / Println 打印时，会优先调用 String()
+// 【坑1】String() 只负责"返回描述"，千万别改字段——它会被任何打印语句
+//        随时调用，改字段 = 打印一次污染一次数据
+// 【坑2】接收者要用值 (p Person)：用指针的话 fmt.Println(p1) 打印【值】不触发，
+//        只有 fmt.Println(&p1) 打印指针才触发
+// 【坑3】方法内部不能再用 %v 打印自己（fmt.Sprintf("%v", p)）→ 无限递归栈溢出
+func (p Person) String() string {
+	return "Person{Name=" + p.Name + ", Age=" + strconv.Itoa(p.Age) + "}"
+}
+
+// ---------- 练习 2：Rectangle / Circle 都挂 Area() ----------
+type Rectangle struct{ W, H float64 }
+type Circle struct{ R float64 }
+
+func (r Rectangle) Area() float64 { return r.W * r.H }
+func (c Circle) Area() float64    { return math.Pi * c.R * c.R }
+
+// 为什么"大结构体适合用指针接收者"？
+// 值接收者 = 每次调用方法都完整【拷贝一份】结构体。
+// Rectangle 只有 16 字节，拷贝无所谓；下面这位每次调用要拷 1MB：
+type BigImage struct {
+	Pixels [1024 * 1024]byte // 1MB 的字段
+}
+
+// 指针接收者：只传 8 字节地址，不拷贝 1MB，还能就地修改
+func (b *BigImage) SetAll(v byte) {
+	for i := range b.Pixels {
+		b.Pixels[i] = v
+	}
+}
+
+// ---------- 练习 3：嵌入实现 Employee ----------
+// Person 的字段和方法全部"提升"：e.Name / e.Greet() / e.Birthday() 都能直接用
+type Employee struct {
+	Person
+	Salary int32
+}
+
+func NewEmployee(name string, age int, salary int32) *Employee {
+	return &Employee{Person: Person{Name: name, Age: age}, Salary: salary}
+}
+
+// 【细节】Person.String() 也会被提升 → 直接打印 Employee 只显示 Person 部分（Salary 消失）
+// 原因：提升来的 String() 其实是 e.Person.String()，它的接收者是 Person 那半个，
+//       代码里只看得见 Name/Age，根本不知道有 Salary 这个字段
+// 解法：Employee 自己定义 String() 遮蔽它（原理同上面 Dog.Describe 遮蔽 Animal.Describe）
+func (e Employee) String() string {
+	return fmt.Sprintf("Employee{名字:%s, 年龄:%d, 工资:%d}", e.Name, e.Age, e.Salary)
+}
