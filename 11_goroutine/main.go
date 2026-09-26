@@ -26,7 +26,7 @@ func main() {
 	go say("世界", 3) // 新开一个协程并发执行
 	say("你好", 1)     // 当前主 goroutine 执行
 
-	// 【经典新手问题】main 函数退出时，所有 goroutine 会被直接杀掉。
+	// 【经典新手问题】main 函数退出时，所有 goroutine 会被直接杀掉。[类比守护线程]
 	// 不做同步的话，上面的输出可能还没打印程序就结束了。
 	// （time.Sleep 是"等一下"的土办法，仅用于演示，别在生产代码用！）
 	time.Sleep(100 * time.Millisecond)
@@ -109,6 +109,15 @@ func main() {
 	// 【哲学】Go 名言：
 	//   "不要通过共享内存来通信，而要通过通信来共享内存"
 	// 下一课的 channel 就是这种"以通信为核心"的并发风格。
+
+	var wg5 sync.WaitGroup
+	go10Print(&wg5)
+	wg5.Wait()
+
+	loopVarTrapDemo()
+
+	// 课后练习 2 见运行说明（-race 对比），练习 3 在这里演示：
+	singletonDemo()
 }
 
 func say(msg string, times int) {
@@ -128,3 +137,100 @@ func rand(n int) int {
 // 2. 用 -race 模式分别跑"无锁计数"和"加锁计数"，观察检测报告。
 // 3. 用 sync.Once 实现一个懒加载的单例配置对象。
 // ============================================================
+
+// 1. 起 10 个 goroutine 并发打印 1~10，用 WaitGroup 等待全部完成。
+func go10Print(wg5 *sync.WaitGroup) {
+	for i := 1; i <= 10; i++ {
+		wg5.Add(1)
+		go func(id int) {
+			defer wg5.Done()
+			fmt.Printf("  goroutine %d\n", id) // 【勘误】用参数 id，别用闭包里的 i！
+		}(i)
+	}
+	// 注意：1~10 的"数字集合"是确定的，但打印"顺序"完全随机 —— 这就是并发。
+}
+
+// 【为什么用参数 id，而不是闭包里的 i？】
+// 闭包捕获的是"变量本身"（引用），不是 go 语句执行那一刻的值快照！
+//
+// Go 1.22 之前：整个 for 循环只有一个共享的 i。goroutine 真正被调度执行时，
+//   循环往往早已跑完，大家读到的都是 i 的终值（本例是 11）=> 打印十个 11（经典面试题）。
+// Go 1.22 起（要求 go.mod >= 1.22，本项目是 1.25）：每轮迭代都会创建新的 i，
+//   直接闭包引用 i 也"碰巧"正确了 —— 但这依赖语言版本，老代码/被复制的代码常翻车。
+// 把 i 作为参数传入：go 执行的一瞬间值就被"复制"进参数，每个 goroutine 各持一份，
+//   与 i 后来的变化彻底无关 —— 任何 Go 版本都对，意图也更明显。
+func loopVarTrapDemo() {
+	var wg sync.WaitGroup
+
+	// 人为复刻老语义：i 声明在循环【外】=> 全程只有一个共享的 i（任何版本都如此）
+	var i int
+	for i = 1; i <= 10; i++ {
+		wg.Add(1)
+		go func() { // 闭包引用共享的 i
+			defer wg.Done()
+			fmt.Print(i, " ")
+		}()
+	}
+	wg.Wait()
+	fmt.Println("<- 闭包直接引用共享变量：全是 11（循环结束时的终值）！")
+
+	// 对照组：同样在循环外声明，但 go 时把值复制进参数
+	k := 0
+	for k = 1; k <= 10; k++ {
+		wg.Add(1)
+		go func(n int) { // go 执行瞬间，k 的当前值被复制进 n
+			defer wg.Done()
+			fmt.Print(n, " ")
+		}(k)
+	}
+	wg.Wait()
+	fmt.Println("<- 传参复制值：1~10（顺序随机）")
+}
+
+// ------------------------------------------------------------
+// 3. 用 sync.Once 实现一个懒加载的单例配置对象。
+//
+// 【懒加载】第一次用到时才初始化，而不是程序一启动就构造（省内存/启动快）。
+// 【单例】无论多少 goroutine 同时调用 GetConfig，拿到的都是同一个 *Config。
+// sync.Once 内部用原子操作 + 互斥锁实现，Do 是并发安全的：
+//   - 第一个调用 Do 的 goroutine 执行 f，其余调用者阻塞等待它完成
+//   - 之后再调用 Do 直接返回，f 不会执行第二次
+// ------------------------------------------------------------
+type Config struct {
+	Addr    string
+	Timeout time.Duration
+}
+
+var (
+	configOnce sync.Once // 零值即可用，不需要初始化（和 Mutex 一样）
+	instance   *Config   // 在 once.Do 的函数体里赋值，写之前无人能读到它
+)
+
+// GetConfig 所有地方都通过它获取配置（不要直接碰 instance 变量）
+func GetConfig() *Config {
+	configOnce.Do(func() {
+		fmt.Println("  [加载配置] 这行只应出现一次...")
+		time.Sleep(50 * time.Millisecond) // 模拟读文件/连数据库等昂贵初始化
+		instance = &Config{Addr: "127.0.0.1:8080", Timeout: 3 * time.Second}
+	})
+	return instance
+}
+
+// singletonDemo 并发调用 GetConfig，验证"只初始化一次 + 全员同一个实例"
+func singletonDemo() {
+	var wg sync.WaitGroup
+	for i := 1; i <= 5; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			cfg := GetConfig()
+			// %p 打印指针地址：5 行的地址应完全相同 => 同一个对象
+			fmt.Printf("  goroutine %d 拿到配置 %p = %+v\n", id, cfg, *cfg)
+		}(i)
+	}
+	wg.Wait()
+
+	// 主 goroutine 再取一次：这次 Do 里的函数不会再执行（上面没打印第二次）
+	fmt.Println("  再次获取:", *GetConfig())
+}
+
